@@ -1,0 +1,112 @@
+sudo -u postgres mkdir basebackup
+sudo -u postgres mkdir wal_archive
+
+
+
+
+Wal_Level =replica or archive
+archive_mode=on
+archive_command =  'cp -i %p /var/lib/pgsql/14/wal_archive/%f'
+archive_timeout = 60
+
+
+restart syste:
+sudo systemctl restart postgresql
+
+for test switch database:
+SELECT pg_switch_wal();
+
+
+--- Normal recovery
+
+sudo -u postgres psql -c "SELECT pg_switch_wal();"
+
+
+# if face error then need to be add host and local to "pg-hba.conf" file
+host    replication    postgres             127.0.0.1/0         trust
+local   replication     postgres                                peer
+
+
+# create 1st and base basebackup
+
+sudo -u postgres pg_basebackup -D /var/lib/pgsql/14/basebackup -Ft -z -P -Xs
+sudo -u postgres pg_basebackup -D /var/lib/pgsql/14/basebackup -Ft -P
+
+
+
+
+rm -rf /var/lib/pgsql/14/data/*
+sudo -u postgres mkdir /var/lib/pgsql/14/data/pg_wal
+
+
+restoration :
+
+
+tar -xvf /var/lib/pgsql/12/basebackup/base.tar -C /var/lib/pgsql/12/data/
+tar -xvf /var/lib/pgsql/12/basebackup/pg_wal.tar -C /var/lib/pgsql/12/data/pg_wal
+
+
+
+
+Restore_command = 'cp /var/lib/pgsql/12/wal_archive/%f %p'
+
+
+
+
+--- PITR
+create database test_db1;
+
+
+\c test_db1;
+create table test_tbl1(id int,name varchar(255));
+insert into test_tbl1
+SELECT generate_series(1,10) AS id, md5(random()::text) AS descr;
+select count(1) from test_tbl1; - 10
+select now();
+SELECT pg_switch_wal();
+
+
+rm -rf /var/lib/pgsql/12/basebackup/*
+sudo -u postgres pg_basebackup -D /var/lib/pgsql/12/basebackup -Ft -P
+
+
+
+
+\c test_db1;
+insert into test_tbl1
+SELECT generate_series(1,10) AS id, md5(random()::text) AS descr;
+select count(1) from test_tbl1; /* 20  */
+select now();  /* restore point  2021-09-23 11:03:25 */
+
+
+
+
+insert into test_tbl1
+SELECT generate_series(1,10) AS id, md5(random()::text) AS descr;
+select count(1) from test_tbl1; /* 30 recoreds */
+select now();
+
+
+ sudo systemctl stop postgresql-12
+
+
+rm -rf /var/lib/pgsql/14/data/*
+sudo -u postgres mkdir /var/lib/pgsql/14/data/pg_wal
+
+
+tar -xvf /var/lib/pgsql/14/basebackup/base.tar -C /var/lib/pgsql/14/data/
+no need to restore wal file
+2021-09-23 09:36:21
+
+
+
+
+sudo -u postgres vi /var/lib/pgsql/14/data/recovery.signal
+restore_command = 'cp /var/lib/pgsql/14/wal_archive/%f %p'
+recovery_target_time = '2021-09-23 11:03:25'
+
+
+select pg_wal_replay_resume();
+
+
+select count(1) from test_tbl1; /* 20  */
