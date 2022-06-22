@@ -66,7 +66,7 @@ then
 # add cornjob to crontab
     ( crontab -l | grep -v -F "$croncmd" ; echo "$cronjob" ) | crontab -
 
-# uninstall cron job
+# unstall cron job
     # ( crontab -l | grep -v -F "$croncmd" ) | crontab -
 
 
@@ -156,6 +156,15 @@ then
 fi
 
 
+
+
 exit 0
+
+
+
+
+
+
+
 
 
