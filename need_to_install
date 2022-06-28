@@ -1,0 +1,10 @@
+for ssh
+sudo apt install openssh-server
+
+sudo apt-get -y install sshpass
+
+
+
+
+
+

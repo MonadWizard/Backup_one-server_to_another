@@ -9,11 +9,12 @@ then
     read -p "Enter Backup server ip address : " backup_server_ip
     read -p "Enter Backup server port : " backup_server_port
     read -p "Enter Backup server username : " backup_server_username
-    read -e -p "Enter Backup server user password : " -s backup_server_password
+    IFS= read -r -e -p "Enter Backup server user password : " -s backup_server_password
     read -p "Enter the path of the folder where backed up : " backup_path
     read -p "Enter recicle backup hour : " backup_hour
 
     pwd=$(pwd)
+
 
     # rm -rf $pwd/config 
     
@@ -33,7 +34,11 @@ then
     echo backup_server_ip: "$backup_server_ip" >> $config_path/config
     echo backup_server_port: "$backup_server_port" >> $config_path/config
     echo backup_server_username: "$backup_server_username" >> $config_path/config
-    echo backup_server_password: "$backup_server_password" >> $config_path/config
+#    echo backup_server_password: "$backup_server_password" >> $config_path/config
+
+    encript_pass=$(echo "$backup_server_password" | openssl enc -aes-256-cbc -md sha512 -a -pbkdf2 -iter 100000 -salt -pass pass:Secret@123#)
+# encripted password......
+    echo backup_server_password: "$encript_pass" >> $config_path/config
 
     echo backup_path: "$backup_path" >> $config_path/config
     echo backup_hour: "$backup_hour" >> $config_path/config
@@ -50,11 +55,19 @@ then
     while IFS=': ' read -r key value; do
         declare $key="$value"
     done < $values
-    
 
         # backup all files
+    # decripted password...........
+    decript_pass=$(echo $backup_server_password | openssl enc -aes-256-cbc -md sha512 -a -d -pbkdf2 -iter 100000 -salt -pass pass:Secret@123#)
 
-    sshpass -p "$backup_server_password" rsync --rsh="ssh -p$backup_server_port" -ru $config_path/welcome $backup_server_username@$backup_server_ip:$backup_path --log-file=$config_path/transperlog.txt
+    # echo "$backup_server_password" | openssl enc -aes-256-cbc -md sha512 -a -d -pbkdf2 -iter 100000 -salt -pass pass:Secret@123#
+    
+    # echo "backup_server_password: $decript_pass"
+
+
+
+
+    sshpass -p "$decript_pass" rsync --rsh="ssh -p$backup_server_port" -ru $config_path/welcome $backup_server_username@$backup_server_ip:$backup_path --log-file=$config_path/transperlog.txt
 
 # create cron job to run auto backup script every day at $backup_hour
     croncmd="$config_path/auto_backup.sh -backup"
@@ -72,7 +85,8 @@ then
 
     # commend out at last it complete......................
     # cp "$(readlink -f $0)" "$config_path"
-    mv "$(readlink -f $0)" "$config_path"
+
+    # mv "$(readlink -f $0)" "$config_path"        #...................................
     exit 1
 fi
 
@@ -88,11 +102,18 @@ then
         declare $key="$value"
     done < $values
 
+    # backup all files
+    # decripted password...........
+    decript_pass=$(echo $backup_server_password | openssl enc -aes-256-cbc -md sha512 -a -d -pbkdf2 -iter 100000 -salt -pass pass:Secret@123#)
+
+
+
+
     if [ 1 == "$backup_type" ]
     then
         # echo "Full Backup"
 
-        sshpass -p "$backup_server_password" rsync --rsh="ssh -p$backup_server_port" -ru $source_path/* $backup_server_username@$backup_server_ip:$backup_path --log-file=$config_path/transperlog.txt
+        sshpass -p "$decript_pass" rsync --rsh="ssh -p$backup_server_port" -ru $source_path/* $backup_server_username@$backup_server_ip:$backup_path --log-file=$config_path/transperlog.txt
 
 
         echo "Backup file created"
@@ -102,7 +123,7 @@ then
 
         # find ~/AGL_DBBackup/DataBases -type f -newermt '2022-05-21 11:02:22' > tmp
 
-        find $source_path -type f -newermt "$now" -exec sshpass -p "$backup_server_password" rsync --rsh="ssh -p$backup_server_port" -ru {} $backup_server_username@$backup_server_ip:$backup_path --log-file=$config_path/transperlog.txt \; 
+        find $source_path -type f -newermt "$now" -exec sshpass -p "$decript_pass" rsync --rsh="ssh -p$backup_server_port" -ru {} $backup_server_username@$backup_server_ip:$backup_path --log-file=$config_path/transperlog.txt \; 
         
         # backup only new files
         echo "Backup file created"
@@ -159,6 +180,7 @@ fi
 
 
 exit 0
+
 
 
 
